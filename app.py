@@ -44,41 +44,90 @@ SECTOR_TO_INDEX = {
 # ══════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_stocks():
-    url = "https://scanner.tradingview.com/turkey/scan"
-    payload = {
-        "columns": ["name", "sector", "indexes"],
-        "sort": {"sortBy": "name", "sortOrder": "asc"},
-        "range": [0, 700],
-        "markets": ["turkey"],
-        "symbols": {"query": {"types": []}, "tickers": []},
-        "options": {"lang": "en"},
-    }
-    resp = requests.post(url, json=payload,
-                         headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
-                         timeout=20)
-    resp.raise_for_status()
-    stocks = {}
+    """TradingView'den hisse listesi, basarisizsa isyatirim'den"""
     bist_set = set(BIST_INDICES)
-    for item in resp.json()["data"]:
-        sym = item["s"].replace("BIST:", "")
-        vals = item["d"]
-        sector = vals[1] if len(vals) > 1 and vals[1] else "Unknown"
-        idx_list = []
-        raw_indexes = vals[2] if len(vals) > 2 and vals[2] else []
-        if isinstance(raw_indexes, list):
-            for idx_info in raw_indexes:
-                if isinstance(idx_info, dict) and "proname" in idx_info:
-                    proname = idx_info["proname"]
-                    if proname.startswith("BIST:"):
-                        idx_name = proname.replace("BIST:", "")
-                        if idx_name in bist_set and idx_name not in idx_list:
-                            idx_list.append(idx_name)
-        if not idx_list:
-            sec_idx = SECTOR_TO_INDEX.get(sector)
-            if sec_idx:
-                idx_list.append(sec_idx)
-            idx_list.append("XUTUM")
-        stocks[sym] = {"sector": sector, "indices": idx_list}
+
+    # Once TradingView dene
+    try:
+        url = "https://scanner.tradingview.com/turkey/scan"
+        payload = {
+            "columns": ["name", "sector", "indexes"],
+            "sort": {"sortBy": "name", "sortOrder": "asc"},
+            "range": [0, 700],
+            "markets": ["turkey"],
+            "symbols": {"query": {"types": []}, "tickers": []},
+            "options": {"lang": "en"},
+        }
+        resp = requests.post(url, json=payload,
+                             headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+                             timeout=20)
+        resp.raise_for_status()
+        stocks = {}
+        for item in resp.json()["data"]:
+            sym = item["s"].replace("BIST:", "")
+            vals = item["d"]
+            sector = vals[1] if len(vals) > 1 and vals[1] else "Unknown"
+            idx_list = []
+            raw_indexes = vals[2] if len(vals) > 2 and vals[2] else []
+            if isinstance(raw_indexes, list):
+                for idx_info in raw_indexes:
+                    if isinstance(idx_info, dict) and "proname" in idx_info:
+                        proname = idx_info["proname"]
+                        if proname.startswith("BIST:"):
+                            idx_name = proname.replace("BIST:", "")
+                            if idx_name in bist_set and idx_name not in idx_list:
+                                idx_list.append(idx_name)
+            if not idx_list:
+                sec_idx = SECTOR_TO_INDEX.get(sector)
+                if sec_idx:
+                    idx_list.append(sec_idx)
+                idx_list.append("XUTUM")
+            stocks[sym] = {"sector": sector, "indices": idx_list}
+        if len(stocks) > 50:
+            return stocks
+    except Exception:
+        pass
+
+    # Fallback: isyatirim'den hisse listesi
+    from isyatirimhisse import fetch_stock_data
+    st.warning("TradingView erisilemedi, isyatirim'den hisse listesi aliniyor...")
+    try:
+        # Tum endekslerden hisse listesi topla
+        from isyatirimhisse import fetch_index_data
+        stocks = {}
+        for idx_name in BIST_INDICES:
+            try:
+                df = fetch_index_data(indices=idx_name,
+                                      start_date=datetime.now().strftime("%d-%m-%Y"),
+                                      end_date=datetime.now().strftime("%d-%m-%Y"))
+                if df is not None and "CODE" in df.columns:
+                    for sym in df["CODE"].unique():
+                        sym = str(sym).strip()
+                        if sym and sym not in stocks:
+                            stocks[sym] = {"sector": "Unknown", "indices": [idx_name]}
+                        elif sym in stocks and idx_name not in stocks[sym]["indices"]:
+                            stocks[sym]["indices"].append(idx_name)
+            except Exception:
+                pass
+        if len(stocks) > 50:
+            return stocks
+    except Exception:
+        pass
+
+    # Son fallback: yfinance ile BIST hisselerini bul
+    import yfinance as yf
+    st.warning("isyatirim hisse listesi de basarisiz, Yahoo Finance deneniyor...")
+    tickers_raw = yf.download("XU100.IS", period="5d", progress=False)
+    # Manuel liste
+    stocks = {}
+    for sym in ["AKBNK","ARCLK","ASELS","BIMAS","BJKAS","DOHOL","EKGYO","ENJSA",
+                "EREGL","FROTO","GARAN","GUBRF","HEKTS","ISCTR","KCHOL","KOZAL",
+                "MGROS","PETKM","PGSUS","SAHOL","SASA","SISE","SOKM","TAVHL",
+                "TCELL","THYAO","TKFEN","TOASO","TTKOM","TUPRS","VESTL","YKBNK",
+                "AKSEN","AEFES","CIMSA","ENKAI","HALKB","VAKBN","OTKAR","TTRAK",
+                "PEKGY","GOZDE","DENGE","FORMT","ADEL","HOROZ","MARTI","ONRYT",
+                "FENER","GSRAY","TSPOR","DGNMO","OSMEN"]:
+        stocks[sym] = {"sector": "Unknown", "indices": ["XUTUM"]}
     return stocks
 
 
