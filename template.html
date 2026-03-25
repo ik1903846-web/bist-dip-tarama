@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIST DIP + ATH Analizi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06080b;--surface:#0c1017;--surface2:#111820;--border:#1c2a38;--border2:#243344;
+  --text:#e4e8ef;--text-muted:#7a8a9e;--text-dim:#4a5a6e;
+  --green:#29e8a0;--green-dim:#29e8a020;--amber:#f0a500;--amber-dim:#f0a50020;
+  --red:#ff5567;--red-dim:#ff556720;--blue:#3b82f6;--blue-dim:#3b82f620;
+  --font-data:'JetBrains Mono',monospace;--font-heading:'Syne',sans-serif;--font-body:'Inter',sans-serif;
+}
+html{font-size:13px;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.5;min-height:100vh;overflow-x:hidden}
+::selection{background:var(--green);color:var(--bg)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+.container{max-width:1600px;margin:0 auto;padding:0 16px}
+
+/* HEADER */
+.header{padding:24px 0 16px;border-bottom:1px solid var(--border)}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.header-title{font-family:var(--font-heading);font-size:1.6rem;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+.header-title span{color:var(--green)}
+.header-meta{display:flex;align-items:center;gap:12px;font-family:var(--font-data);font-size:0.8rem;color:var(--text-muted)}
+.header-meta .sep{color:var(--border2)}
+.header-meta .val{color:var(--text)}
+
+/* STATS CARDS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:0}
+.stat-card{background:var(--surface);border:1px solid var(--border);padding:14px 16px;display:flex;flex-direction:column;gap:4px;transition:border-color .15s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card .stat-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);font-weight:500}
+.stat-card .stat-value{font-family:var(--font-data);font-size:1.35rem;font-weight:700;color:var(--text)}
+.stat-card .stat-value.green{color:var(--green)}
+.stat-card .stat-value.amber{color:var(--amber)}
+.stat-card .stat-value.red{color:var(--red)}
+.stat-card .stat-value.blue{color:var(--blue)}
+
+/* TABS */
+.tabs-section{padding:14px 0 0;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs-row{display:flex;gap:0;min-width:max-content}
+.tab-btn{
+  font-family:var(--font-data);font-size:0.78rem;font-weight:500;
+  padding:8px 16px;border:none;background:none;color:var(--text-muted);
+  cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+  transition:color .15s,border-color .15s,background .15s;
+  letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text);background:var(--surface)}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);background:var(--surface)}
+.tab-btn.star-tab{color:var(--amber)}
+.tab-btn.star-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+
+/* CONTROLS BAR */
+.controls-bar{display:flex;align-items:center;gap:12px;padding:14px 0;flex-wrap:wrap}
+.control-group{display:flex;align-items:center;gap:8px}
+.control-label{font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;font-weight:500}
+.search-input{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  font-family:var(--font-data);font-size:0.82rem;padding:7px 12px;width:200px;
+  outline:none;transition:border-color .15s;
+}
+.search-input:focus{border-color:var(--green)}
+.search-input::placeholder{color:var(--text-dim)}
+input[type="range"]{
+  -webkit-appearance:none;appearance:none;height:4px;background:var(--border);
+  outline:none;cursor:pointer;width:120px;
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:14px;height:14px;
+  background:var(--green);border:none;cursor:pointer;
+}
+input[type="range"]::-moz-range-thumb{
+  width:14px;height:14px;background:var(--green);border:none;cursor:pointer;border-radius:0;
+}
+.range-val{font-family:var(--font-data);font-size:0.78rem;color:var(--green);min-width:36px}
+select{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  font-family:var(--font-data);font-size:0.78rem;padding:7px 28px 7px 10px;
+  outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237a8a9e'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+select:focus{border-color:var(--green)}
+.btn{
+  font-family:var(--font-data);font-size:0.76rem;font-weight:600;
+  padding:7px 14px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-muted);cursor:pointer;transition:all .15s;letter-spacing:0.3px;
+}
+.btn:hover{border-color:var(--text-muted);color:var(--text)}
+.btn-green{border-color:var(--green);color:var(--green)}
+.btn-green:hover{background:var(--green);color:var(--bg)}
+.btn-amber{border-color:var(--amber);color:var(--amber)}
+.btn-amber:hover{background:var(--amber);color:var(--bg)}
+.controls-spacer{flex:1}
+
+/* TABLE */
+.table-wrapper{overflow-x:auto;border:1px solid var(--border);margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-family:var(--font-data);font-size:0.78rem}
+thead{position:sticky;top:0;z-index:10}
+thead th{
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  padding:10px 10px;text-align:left;font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:0.6px;font-size:0.68rem;
+  white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s;
+}
+thead th:hover{color:var(--text)}
+thead th.sort-active{color:var(--green)}
+thead th .sort-arrow{margin-left:4px;font-size:0.6rem;opacity:0.5}
+thead th.sort-active .sort-arrow{opacity:1}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:nth-child(even){background:rgba(12,16,23,0.5)}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:8px 10px;white-space:nowrap;vertical-align:middle}
+td.mono{font-family:var(--font-data)}
+.ticker-cell{font-weight:700;color:var(--text);letter-spacing:0.3px}
+.sector-cell{color:var(--text-muted);font-size:0.72rem;max-width:100px;overflow:hidden;text-overflow:ellipsis}
+
+/* Star button */
+.star-btn{
+  background:none;border:none;cursor:pointer;font-size:1rem;
+  color:var(--text-dim);transition:color .15s;padding:2px;line-height:1;
+}
+.star-btn:hover{color:var(--amber)}
+.star-btn.starred{color:var(--amber)}
+
+/* ATL Fark badge */
+.fark-badge{
+  display:inline-block;padding:2px 8px;font-weight:600;font-size:0.76rem;
+  min-width:56px;text-align:center;
+}
+.fark-green{background:var(--green-dim);color:var(--green)}
+.fark-amber{background:var(--amber-dim);color:var(--amber)}
+.fark-red{background:var(--red-dim);color:var(--red)}
+
+/* ATH Pot bar */
+.pot-cell{display:flex;align-items:center;gap:6px}
+.pot-bar-wrap{width:50px;height:5px;background:var(--border);overflow:hidden;flex-shrink:0}
+.pot-bar{height:100%;background:var(--blue);transition:width .3s}
+.pot-val{font-weight:600;min-width:44px}
+
+/* GH stars */
+.gh-stars{color:var(--amber);letter-spacing:-1px}
+
+/* Links */
+.link-cell{display:flex;gap:6px}
+.link-cell a{
+  color:var(--text-dim);text-decoration:none;font-size:0.72rem;font-weight:600;
+  padding:2px 6px;border:1px solid var(--border);transition:all .15s;
+}
+.link-cell a:hover{border-color:var(--text-muted);color:var(--text)}
+
+/* Notes input */
+.note-input{
+  background:transparent;border:1px solid transparent;color:var(--text-muted);
+  font-family:var(--font-data);font-size:0.72rem;padding:3px 6px;width:90px;
+  outline:none;transition:border-color .15s;
+}
+.note-input:focus{border-color:var(--border2);color:var(--text);background:var(--surface)}
+.note-input::placeholder{color:var(--text-dim)}
+
+/* Grafik cell */
+.grafik-cell{color:var(--text-muted);font-size:0.72rem}
+
+/* FOOTER */
+.footer{padding:20px 0;border-top:1px solid var(--border);margin-top:10px}
+.footer-text{font-size:0.7rem;color:var(--text-dim);line-height:1.7;max-width:800px}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty-state .empty-icon{font-size:2.4rem;margin-bottom:12px;opacity:0.4}
+.empty-state .empty-msg{font-size:0.88rem}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  html{font-size:12px}
+  .container{padding:0 10px}
+  .header-top{flex-direction:column;align-items:flex-start}
+  .stats-row{grid-template-columns:repeat(3,1fr)}
+  .controls-bar{gap:8px}
+  .search-input{width:140px}
+  input[type="range"]{width:80px}
+  .controls-spacer{display:none}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .controls-bar{flex-direction:column;align-items:stretch}
+  .control-group{flex-wrap:wrap}
+}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .2s ease}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <h1 class="header-title">BIST <span>DIP</span> + ATH ANALİZİ</h1>
+      <div class="header-meta">
+        <span>USD/TRY: <span class="val" id="metaUsd"></span></span>
+        <span class="sep">|</span>
+        <span>Tarih: <span class="val" id="metaDate"></span></span>
+        <span class="sep">|</span>
+        <span>Taranan: <span class="val" id="metaTotal"></span></span>
+        <span class="sep">|</span>
+        <span>Eşik: %<span class="val" id="metaThreshold"></span></span>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><span class="stat-label">Toplam Hisse</span><span class="stat-value" id="statTotal">0</span></div>
+      <div class="stat-card"><span class="stat-label">ATL'de</span><span class="stat-value green" id="statAtl">0</span></div>
+      <div class="stat-card"><span class="stat-label">Dip Adayı</span><span class="stat-value amber" id="statDip">0</span></div>
+      <div class="stat-card"><span class="stat-label">GH &ge; 3</span><span class="stat-value red" id="statGh">0</span></div>
+      <div class="stat-card"><span class="stat-label">İzlemede</span><span class="stat-value blue" id="statWatch">0</span></div>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tabs-section">
+    <div class="tabs-row" id="tabsRow"></div>
+  </nav>
+
+  <!-- CONTROLS -->
+  <div class="controls-bar">
+    <div class="control-group">
+      <label class="control-label" for="searchInput">Ara</label>
+      <input type="text" class="search-input" id="searchInput" placeholder="Hisse kodu...">
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="atlSlider">Maks ATL%</label>
+      <input type="range" id="atlSlider" min="0" max="100" value="100" step="1">
+      <span class="range-val" id="atlSliderVal">100%</span>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="ghFilter">Min GH</label>
+      <select id="ghFilter">
+        <option value="0">Hepsi</option>
+        <option value="1">GH &ge; 1</option>
+        <option value="2">GH &ge; 2</option>
+        <option value="3">GH &ge; 3</option>
+        <option value="4">GH &ge; 4</option>
+        <option value="5">GH &ge; 5</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="sortSelect">Sırala</label>
+      <select id="sortSelect">
+        <option value="atl_fark_asc">ATL Fark% (Artan)</option>
+        <option value="atl_fark_desc">ATL Fark% (Azalan)</option>
+        <option value="ath_pot_desc">ATH Pot% (Azalan)</option>
+        <option value="ath_pot_asc">ATH Pot% (Artan)</option>
+        <option value="gh_desc">GH (Azalan)</option>
+        <option value="ticker_asc">Hisse (A-Z)</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <button class="btn" id="resetBtn">Sıfırla</button>
+    </div>
+    <div class="controls-spacer"></div>
+    <div class="control-group">
+      <button class="btn btn-green" id="exportBtn">XLSX İndir</button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrapper">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th style="width:36px" data-sort="star"><span class="sort-arrow"></span></th>
+          <th data-sort="index"># <span class="sort-arrow"></span></th>
+          <th data-sort="ticker">Hisse <span class="sort-arrow"></span></th>
+          <th data-sort="sector">Sektör <span class="sort-arrow"></span></th>
+          <th data-sort="price" id="thPrice">Fiyat <span class="sort-arrow"></span></th>
+          <th data-sort="atl" id="thAtl">ATL <span class="sort-arrow"></span></th>
+          <th data-sort="ath" id="thAth">ATH <span class="sort-arrow"></span></th>
+          <th data-sort="atl_fark" class="sort-active" id="thFark">ATL Fark% <span class="sort-arrow">▲</span></th>
+          <th data-sort="ath_pot" id="thPot">ATH Pot% <span class="sort-arrow"></span></th>
+          <th data-sort="grafik">Grafik <span class="sort-arrow"></span></th>
+          <th data-sort="gh">GH <span class="sort-arrow"></span></th>
+          <th style="cursor:default">Not</th>
+          <th style="cursor:default">Link</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="empty-icon">&#x1F50D;</div>
+      <div class="empty-msg">Filtrelere uygun hisse bulunamadı.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p class="footer-text">
+      Bu tablo yatırım tavsiyesi değildir. Tüm veriler kamuya açık kaynaklardan derlenmiştir.
+      ATL (All Time Low) ve ATH (All Time High) değerleri günlük kapanış bazlıdır.
+      Yatırım kararlarınızı vermeden önce kendi araştırmanızı yapınız. GH = Güvenilirlik Hissi (algoritmik skor).
+      Veri kaynağı: BIST, KAP, TradingView. Son güncelleme: <span id="footerDate"></span>.
+    </p>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+const RAW = __DATA__;
+const INDICES = __INDICES__;
+const META = __META__;
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS_KEY_WATCH = 'bist_dip_watchlist';
+const LS_KEY_NOTES = 'bist_dip_notes';
+
+let watchlist = JSON.parse(localStorage.getItem(LS_KEY_WATCH) || '{}');
+let notes = JSON.parse(localStorage.getItem(LS_KEY_NOTES) || '{}');
+
+let activeTab = 'TUMU';
+let searchQuery = '';
+let maxAtlPct = 100;
+let minGh = 0;
+let sortKey = 'atl_fark';
+let sortDir = 'asc';
+let headerSortCol = 'atl_fark';
+let headerSortDir = 'asc';
+
+/* ============================================================
+   INIT META
+   ============================================================ */
+document.getElementById('metaUsd').textContent = META.usdtry;
+document.getElementById('metaDate').textContent = META.date;
+document.getElementById('metaTotal').textContent = META.total_scanned;
+document.getElementById('metaThreshold').textContent = META.threshold;
+document.getElementById('footerDate').textContent = META.date;
+
+/* ============================================================
+   PARSE ENDEKS DETAY
+   ============================================================ */
+function parseEndeksDetay(detayStr) {
+  const result = {};
+  if (!detayStr) return result;
+  const parts = detayStr.split('|');
+  parts.forEach(part => {
+    const trimmed = part.trim();
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx === -1) return;
+    const key = trimmed.substring(0, colonIdx).trim();
+    let valStr = trimmed.substring(colonIdx + 1).trim();
+    valStr = valStr.replace('%', '').replace(',', '.');
+    const val = parseFloat(valStr);
+    if (!isNaN(val)) result[key] = val;
+  });
+  return result;
+}
+
+/* Pre-parse endeks data for each stock */
+RAW.forEach(stock => {
+  stock._endeks = parseEndeksDetay(stock['Endeks Detay']);
+  stock._dahilSet = new Set(
+    (stock['Dahil Endeksler'] || '').split(',').map(s => s.trim()).filter(Boolean)
+  );
+});
+
+/* ============================================================
+   BUILD TABS
+   ============================================================ */
+function buildTabs() {
+  const row = document.getElementById('tabsRow');
+  row.innerHTML = '';
+
+  const fixedTabs = ['TUMU', 'TL', 'USD'];
+  const allTabs = [...fixedTabs, ...INDICES];
+
+  allTabs.forEach(tab => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (tab === activeTab ? ' active' : '');
+    btn.textContent = tab === 'TUMU' ? 'TÜMÜ' : tab;
+    btn.dataset.tab = tab;
+    btn.addEventListener('click', () => {
+      activeTab = tab;
+      updateTabs();
+      resetHeaderSort();
+      render();
+    });
+    row.appendChild(btn);
+  });
+
+  /* Star tab */
+  const starBtn = document.createElement('button');
+  starBtn.className = 'tab-btn star-tab' + (activeTab === 'IZLEME' ? ' active' : '');
+  starBtn.innerHTML = '&#x2B50; İZLEME';
+  starBtn.dataset.tab = 'IZLEME';
+  starBtn.addEventListener('click', () => {
+    activeTab = 'IZLEME';
+    updateTabs();
+    render();
+  });
+  row.appendChild(starBtn);
+}
+
+function updateTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === activeTab);
+  });
+}
+
+/* ============================================================
+   GET VALUES FOR CURRENT TAB
+   ============================================================ */
+function getStockValues(stock) {
+  if (activeTab === 'USD') {
+    return {
+      price: stock['USD Fiyat'],
+      atl: stock['USD ATL'],
+      ath: null,
+      atl_fark: stock['usd_atl_fark'],
+      ath_pot: stock['usd_ath_pot'],
+      priceFmt: formatUsd,
+      atlFmt: formatUsd,
+      athFmt: () => '-',
+      suffix: '$',
+    };
+  }
+  if (activeTab === 'TL' || activeTab === 'TUMU' || activeTab === 'IZLEME') {
+    return {
+      price: stock['TL Fiyat'],
+      atl: stock['TL ATL'],
+      ath: stock['TL ATH'],
+      atl_fark: stock['tl_atl_fark'] != null ? stock['tl_atl_fark'] : stock['atl_fark'],
+      ath_pot: stock['tl_ath_pot'] != null ? stock['tl_ath_pot'] : stock['ath_pot'],
+      priceFmt: formatTl,
+      atlFmt: formatTl,
+      athFmt: formatTl,
+      suffix: 'TL',
+    };
+  }
+  /* Index tab */
+  const idxVal = stock._endeks[activeTab];
+  return {
+    price: stock['TL Fiyat'],
+    atl: stock['TL ATL'],
+    ath: stock['TL ATH'],
+    atl_fark: idxVal != null ? idxVal : 999,
+    ath_pot: stock['ath_pot'],
+    priceFmt: formatTl,
+    atlFmt: formatTl,
+    athFmt: formatTl,
+    suffix: 'TL',
+  };
+}
+
+function formatTl(v) {
+  if (v == null) return '-';
+  return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL';
+}
+function formatUsd(v) {
+  if (v == null) return '-';
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+}
+
+/* ============================================================
+   FILTER + SORT
+   ============================================================ */
+function getFilteredData() {
+  let data = [...RAW];
+
+  /* Tab filter */
+  if (activeTab === 'IZLEME') {
+    data = data.filter(s => watchlist[s['Hisse']]);
+  } else if (activeTab !== 'TUMU' && activeTab !== 'TL' && activeTab !== 'USD') {
+    data = data.filter(s => s._dahilSet.has(activeTab));
+  }
+
+  /* Search */
+  if (searchQuery) {
+    const q = searchQuery.toUpperCase();
+    data = data.filter(s => s['Hisse'].toUpperCase().includes(q));
+  }
+
+  /* ATL% slider */
+  data = data.filter(s => {
+    const vals = getStockValues(s);
+    return vals.atl_fark != null && vals.atl_fark <= maxAtlPct;
+  });
+
+  /* Min GH */
+  if (minGh > 0) {
+    data = data.filter(s => (s['gh'] || 0) >= minGh);
+  }
+
+  /* Sort */
+  data.sort((a, b) => {
+    const va = getStockValues(a);
+    const vb = getStockValues(b);
+    let av, bv;
+
+    switch (headerSortCol) {
+      case 'star':
+        av = watchlist[a['Hisse']] ? 1 : 0;
+        bv = watchlist[b['Hisse']] ? 1 : 0;
+        break;
+      case 'ticker':
+        av = a['Hisse'];
+        bv = b['Hisse'];
+        return headerSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      case 'sector':
+        av = a['Sektor'] || '';
+        bv = b['Sektor'] || '';
+        return headerSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      case 'price':
+        av = va.price || 0;
+        bv = vb.price || 0;
+        break;
+      case 'atl':
+        av = va.atl || 0;
+        bv = vb.atl || 0;
+        break;
+      case 'ath':
+        av = va.ath || 0;
+        bv = vb.ath || 0;
+        break;
+      case 'atl_fark':
+        av = va.atl_fark != null ? va.atl_fark : 9999;
+        bv = vb.atl_fark != null ? vb.atl_fark : 9999;
+        break;
+      case 'ath_pot':
+        av = va.ath_pot || 0;
+        bv = vb.ath_pot || 0;
+        break;
+      case 'grafik':
+        av = a['En Yakin Grafik'] || '';
+        bv = b['En Yakin Grafik'] || '';
+        return headerSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      case 'gh':
+        av = a['gh'] || 0;
+        bv = b['gh'] || 0;
+        break;
+      default:
+        av = va.atl_fark != null ? va.atl_fark : 9999;
+        bv = vb.atl_fark != null ? vb.atl_fark : 9999;
+    }
+
+    if (headerSortDir === 'asc') return (av > bv ? 1 : av < bv ? -1 : 0);
+    return (av < bv ? 1 : av > bv ? -1 : 0);
+  });
+
+  return data;
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render() {
+  const data = getFilteredData();
+  const tbody = document.getElementById('tableBody');
+  const emptyEl = document.getElementById('emptyState');
+
+  /* Update column headers based on tab */
+  const thPrice = document.getElementById('thPrice');
+  const thAtl = document.getElementById('thAtl');
+  const thAth = document.getElementById('thAth');
+  const thFark = document.getElementById('thFark');
+  const thPot = document.getElementById('thPot');
+
+  if (activeTab === 'USD') {
+    thPrice.firstChild.textContent = 'USD Fiyat ';
+    thAtl.firstChild.textContent = 'USD ATL ';
+    thAth.firstChild.textContent = 'USD ATH ';
+    thFark.firstChild.textContent = 'USD ATL% ';
+    thPot.firstChild.textContent = 'USD ATH Pot% ';
+  } else if (activeTab !== 'TUMU' && activeTab !== 'TL' && activeTab !== 'IZLEME') {
+    thPrice.firstChild.textContent = 'TL Fiyat ';
+    thAtl.firstChild.textContent = 'TL ATL ';
+    thAth.firstChild.textContent = 'TL ATH ';
+    thFark.firstChild.textContent = activeTab + ' ATL% ';
+    thPot.firstChild.textContent = 'ATH Pot% ';
+  } else {
+    thPrice.firstChild.textContent = 'TL Fiyat ';
+    thAtl.firstChild.textContent = 'TL ATL ';
+    thAth.firstChild.textContent = 'TL ATH ';
+    thFark.firstChild.textContent = 'ATL Fark% ';
+    thPot.firstChild.textContent = 'ATH Pot% ';
+  }
+
+  if (data.length === 0) {
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    updateStats(data);
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  let html = '';
+  data.forEach((stock, idx) => {
+    const vals = getStockValues(stock);
+    const ticker = stock['Hisse'];
+    const isStarred = watchlist[ticker];
+    const note = notes[ticker] || '';
+    const gh = stock['gh'] || 0;
+
+    /* Fark badge color */
+    let farkClass = 'fark-red';
+    const farkVal = vals.atl_fark;
+    if (farkVal != null) {
+      if (farkVal <= 5) farkClass = 'fark-green';
+      else if (farkVal <= 15) farkClass = 'fark-amber';
+    }
+
+    /* GH stars */
+    let ghStars = '';
+    for (let i = 0; i < Math.min(gh, 5); i++) ghStars += '\u2B50';
+    if (gh === 0) ghStars = '<span style="color:var(--text-dim)">-</span>';
+
+    /* ATH Pot bar width */
+    const potVal = vals.ath_pot || 0;
+    const barW = Math.min(potVal / 5, 100);
+
+    /* Price formatting */
+    const priceStr = vals.priceFmt(vals.price);
+    const atlStr = vals.atlFmt(vals.atl);
+    const athStr = vals.ath != null ? vals.athFmt(vals.ath) : '-';
+    const farkStr = farkVal != null ? '%' + farkVal.toFixed(1) : '-';
+    const potStr = potVal != null ? '%' + potVal.toFixed(0) : '-';
+
+    /* TradingView link */
+    const tvUrl = 'https://www.tradingview.com/chart/?symbol=BIST%3A' + encodeURIComponent(ticker);
+    const kapUrl = 'https://www.kap.org.tr/tr/bist-sirketler/' + encodeURIComponent(ticker);
+
+    html += '<tr class="fade-in">';
+    html += '<td><button class="star-btn' + (isStarred ? ' starred' : '') + '" data-ticker="' + ticker + '" onclick="toggleStar(this)">' + (isStarred ? '\u2B50' : '\u2606') + '</button></td>';
+    html += '<td style="color:var(--text-dim)">' + (idx + 1) + '</td>';
+    html += '<td class="ticker-cell">' + ticker + '</td>';
+    html += '<td class="sector-cell" title="' + (stock['Sektor'] || '') + '">' + (stock['Sektor'] || '-') + '</td>';
+    html += '<td class="mono">' + priceStr + '</td>';
+    html += '<td class="mono" style="color:var(--green)">' + atlStr + '</td>';
+    html += '<td class="mono" style="color:var(--text-muted)">' + athStr + '</td>';
+    html += '<td><span class="fark-badge ' + farkClass + '">' + farkStr + '</span></td>';
+    html += '<td><div class="pot-cell"><div class="pot-bar-wrap"><div class="pot-bar" style="width:' + barW + '%"></div></div><span class="pot-val" style="color:var(--blue)">' + potStr + '</span></div></td>';
+    html += '<td class="grafik-cell">' + (stock['En Yakin Grafik'] || '-') + '</td>';
+    html += '<td class="gh-stars">' + ghStars + '</td>';
+    html += '<td><input type="text" class="note-input" placeholder="..." value="' + escapeAttr(note) + '" data-ticker="' + ticker + '" onchange="saveNote(this)"></td>';
+    html += '<td><div class="link-cell"><a href="' + tvUrl + '" target="_blank" rel="noopener">TV</a><a href="' + kapUrl + '" target="_blank" rel="noopener">KAP</a></div></td>';
+    html += '</tr>';
+  });
+
+  tbody.innerHTML = html;
+  updateStats(data);
+}
+
+function escapeAttr(str) {
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ============================================================
+   STATS
+   ============================================================ */
+function updateStats(filteredData) {
+  const total = filteredData.length;
+  let atlCount = 0;
+  let dipCount = 0;
+  let ghCount = 0;
+  let watchCount = 0;
+
+  RAW.forEach(s => { if (watchlist[s['Hisse']]) watchCount++; });
+
+  filteredData.forEach(s => {
+    const vals = getStockValues(s);
+    const fark = vals.atl_fark;
+    if (fark != null && fark <= 2) atlCount++;
+    if (fark != null && fark <= 10) dipCount++;
+    if ((s['gh'] || 0) >= 3) ghCount++;
+  });
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statAtl').textContent = atlCount;
+  document.getElementById('statDip').textContent = dipCount;
+  document.getElementById('statGh').textContent = ghCount;
+  document.getElementById('statWatch').textContent = watchCount;
+}
+
+/* ============================================================
+   INTERACTIONS
+   ============================================================ */
+function toggleStar(btn) {
+  const ticker = btn.dataset.ticker;
+  if (watchlist[ticker]) {
+    delete watchlist[ticker];
+    btn.classList.remove('starred');
+    btn.textContent = '\u2606';
+  } else {
+    watchlist[ticker] = true;
+    btn.classList.add('starred');
+    btn.textContent = '\u2B50';
+  }
+  localStorage.setItem(LS_KEY_WATCH, JSON.stringify(watchlist));
+  updateStats(getFilteredData());
+  /* If on watchlist tab, re-render */
+  if (activeTab === 'IZLEME') render();
+}
+
+function saveNote(input) {
+  const ticker = input.dataset.ticker;
+  const val = input.value.trim();
+  if (val) {
+    notes[ticker] = val;
+  } else {
+    delete notes[ticker];
+  }
+  localStorage.setItem(LS_KEY_NOTES, JSON.stringify(notes));
+}
+
+/* Search */
+document.getElementById('searchInput').addEventListener('input', function() {
+  searchQuery = this.value.trim();
+  render();
+});
+
+/* ATL slider */
+const atlSlider = document.getElementById('atlSlider');
+const atlSliderVal = document.getElementById('atlSliderVal');
+atlSlider.addEventListener('input', function() {
+  maxAtlPct = parseFloat(this.value);
+  atlSliderVal.textContent = maxAtlPct + '%';
+  render();
+});
+
+/* GH filter */
+document.getElementById('ghFilter').addEventListener('change', function() {
+  minGh = parseInt(this.value);
+  render();
+});
+
+/* Sort select */
+document.getElementById('sortSelect').addEventListener('change', function() {
+  const val = this.value;
+  switch(val) {
+    case 'atl_fark_asc': headerSortCol = 'atl_fark'; headerSortDir = 'asc'; break;
+    case 'atl_fark_desc': headerSortCol = 'atl_fark'; headerSortDir = 'desc'; break;
+    case 'ath_pot_desc': headerSortCol = 'ath_pot'; headerSortDir = 'desc'; break;
+    case 'ath_pot_asc': headerSortCol = 'ath_pot'; headerSortDir = 'asc'; break;
+    case 'gh_desc': headerSortCol = 'gh'; headerSortDir = 'desc'; break;
+    case 'ticker_asc': headerSortCol = 'ticker'; headerSortDir = 'asc'; break;
+  }
+  updateHeaderSortUI();
+  render();
+});
+
+/* Reset */
+document.getElementById('resetBtn').addEventListener('click', function() {
+  searchQuery = '';
+  maxAtlPct = 100;
+  minGh = 0;
+  headerSortCol = 'atl_fark';
+  headerSortDir = 'asc';
+  document.getElementById('searchInput').value = '';
+  atlSlider.value = 100;
+  atlSliderVal.textContent = '100%';
+  document.getElementById('ghFilter').value = '0';
+  document.getElementById('sortSelect').value = 'atl_fark_asc';
+  updateHeaderSortUI();
+  render();
+});
+
+/* Header column sorting */
+document.querySelectorAll('thead th[data-sort]').forEach(th => {
+  th.addEventListener('click', function() {
+    const col = this.dataset.sort;
+    if (!col) return;
+    if (headerSortCol === col) {
+      headerSortDir = headerSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      headerSortCol = col;
+      headerSortDir = 'asc';
+    }
+    updateHeaderSortUI();
+    syncSortSelect();
+    render();
+  });
+});
+
+function resetHeaderSort() {
+  headerSortCol = 'atl_fark';
+  headerSortDir = 'asc';
+  updateHeaderSortUI();
+  document.getElementById('sortSelect').value = 'atl_fark_asc';
+}
+
+function updateHeaderSortUI() {
+  document.querySelectorAll('thead th[data-sort]').forEach(th => {
+    const col = th.dataset.sort;
+    const arrow = th.querySelector('.sort-arrow');
+    if (col === headerSortCol) {
+      th.classList.add('sort-active');
+      if (arrow) arrow.textContent = headerSortDir === 'asc' ? '\u25B2' : '\u25BC';
+    } else {
+      th.classList.remove('sort-active');
+      if (arrow) arrow.textContent = '';
+    }
+  });
+}
+
+function syncSortSelect() {
+  const sel = document.getElementById('sortSelect');
+  const key = headerSortCol + '_' + headerSortDir;
+  const map = {
+    'atl_fark_asc': 'atl_fark_asc',
+    'atl_fark_desc': 'atl_fark_desc',
+    'ath_pot_desc': 'ath_pot_desc',
+    'ath_pot_asc': 'ath_pot_asc',
+    'gh_desc': 'gh_desc',
+    'ticker_asc': 'ticker_asc',
+  };
+  if (map[key]) sel.value = map[key];
+}
+
+/* ============================================================
+   XLSX EXPORT
+   ============================================================ */
+document.getElementById('exportBtn').addEventListener('click', function() {
+  const data = getFilteredData();
+  if (data.length === 0) return;
+
+  const rows = data.map((stock, idx) => {
+    const vals = getStockValues(stock);
+    return {
+      '#': idx + 1,
+      'Hisse': stock['Hisse'],
+      'Sektör': stock['Sektor'] || '',
+      'TL Fiyat': stock['TL Fiyat'],
+      'TL ATL': stock['TL ATL'],
+      'TL ATH': stock['TL ATH'],
+      'TL ATL Fark%': stock['tl_atl_fark'],
+      'TL ATH Pot%': stock['tl_ath_pot'],
+      'USD Fiyat': stock['USD Fiyat'],
+      'USD ATL': stock['USD ATL'],
+      'USD ATL Fark%': stock['usd_atl_fark'],
+      'USD ATH Pot%': stock['usd_ath_pot'],
+      'ATL Fark% (Aktif)': vals.atl_fark != null ? vals.atl_fark : '',
+      'ATH Pot% (Aktif)': vals.ath_pot != null ? vals.ath_pot : '',
+      'En Yakın Grafik': stock['En Yakin Grafik'] || '',
+      'GH': stock['gh'] || 0,
+      'Dahil Endeksler': stock['Dahil Endeksler'] || '',
+      'Not': notes[stock['Hisse']] || '',
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  /* Column widths */
+  ws['!cols'] = [
+    {wch:4},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},
+    {wch:12},{wch:12},{wch:10},{wch:10},{wch:12},{wch:12},
+    {wch:14},{wch:14},{wch:14},{wch:5},{wch:30},{wch:20}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'BIST Dip Tarama');
+
+  const tabName = activeTab === 'TUMU' ? 'Tumu' : activeTab;
+  XLSX.writeFile(wb, 'bist_dip_' + tabName + '_' + META.date + '.xlsx');
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+buildTabs();
+updateHeaderSortUI();
+render();
+</script>
+</body>
+</html>
