@@ -129,6 +129,27 @@ def dl_batch(symbols, interval="1wk", batch_size=50, progress_bar=None):
     return result
 
 
+def dl_indices(interval="1wk"):
+    """Is Yatirim'dan tum BIST endeks verilerini indir"""
+    from isyatirimhisse import fetch_index_data
+    idx_data = {}
+    for name in BIST_INDICES:
+        try:
+            df = fetch_index_data(indices=name, start_date="01-01-2010",
+                                  end_date=datetime.now().strftime("%d-%m-%Y"))
+            if df is not None and len(df) > 50:
+                s = df.set_index("DATE")["VALUE"].astype(float)
+                s.index = pd.to_datetime(s.index)
+                if interval == "1wk":
+                    s = s.resample("W-FRI").last().dropna()
+                elif interval == "1mo":
+                    s = s.resample("ME").last().dropna()
+                idx_data[name] = s
+        except Exception:
+            pass
+    return idx_data
+
+
 def gorsel_hafiza(close_arr):
     n = len(close_arr)
     if n < 20:
@@ -285,18 +306,9 @@ def main():
             usdtry_rate = float(usdtry.iloc[-1])
             st.write(f"✅ USDTRY: {usdtry_rate:.2f}")
 
-            st.write("📈 Endeks verileri indiriliyor...")
-            indices = {}
-            for name in BIST_INDICES:
-                s = dl_single(f"{name}.IS", interval)
-                if s is not None:
-                    indices[name] = s
-            if "XU100" in indices:
-                if "XUTUM" not in indices:
-                    indices["XUTUM"] = indices["XU100"]
-                if "XTUMY" not in indices:
-                    indices["XTUMY"] = indices["XU100"]
-            st.write(f"✅ {len(indices)} endeks alindi")
+            st.write("📈 Endeks verileri indiriliyor (isyatirim.com.tr)...")
+            indices = dl_indices(interval)
+            st.write(f"✅ {len(indices)}/{len(BIST_INDICES)} endeks alindi")
 
             st.write("📊 Hisse verileri indiriliyor...")
             progress = st.progress(0, text="Basliyor...")
