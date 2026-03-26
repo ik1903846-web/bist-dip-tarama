@@ -133,7 +133,7 @@ def run_scan(stock_data, stocks_info, usdtry, indices, threshold):
             best = min(candidates, key=lambda x: x[1])
             if not any(c[1] <= threshold for c in candidates): continue
             gh = gorsel_hafiza(close.values)
-            idx_parts = [f"{ir['name']}:%{ir['atl_pct']:.1f}" for ir in sorted(idx_results, key=lambda x: abs(x["atl_pct"]))]
+            idx_parts = [f"{ir['name']}:%{ir['atl_pct']:.1f}|+%{ir['ath_pot']:.0f}" for ir in sorted(idx_results, key=lambda x: abs(x["atl_pct"]))]
             results.append({
                 "Hisse": sym, "Sektor": sector, "Dahil Endeksler": ", ".join(stock_indices),
                 "En Yakin Grafik": best[0], "atl_fark": round(abs(best[2]), 2),
@@ -173,11 +173,18 @@ def main():
 
     with st.sidebar:
         st.header("Ayarlar")
-        threshold = st.slider("ATL Esik (%)", 5, 30, 15, 1)
+        threshold = st.slider("ATL Esik (%)", 5, 50, 15, 1)
+        period = st.selectbox("Tarama Periyodu", ["Haftalik", "Aylik", "Son 6 Ay", "Son 12 Ay"])
 
     if st.button("Taramayi Baslat", type="primary", use_container_width=True):
         from tvDatafeed import TvDatafeed, Interval
-        interval = Interval.in_weekly
+        period_map = {
+            "Haftalik": (Interval.in_weekly, 5000),
+            "Aylik": (Interval.in_monthly, 5000),
+            "Son 6 Ay": (Interval.in_weekly, 26),
+            "Son 12 Ay": (Interval.in_weekly, 52),
+        }
+        interval, n_bars = period_map[period]
 
         with st.status("Tarama baslatiliyor...", expanded=True) as status:
             st.write("Hisse listesi aliniyor...")
@@ -188,7 +195,7 @@ def main():
             tv = TvDatafeed()
 
             st.write("USDTRY indiriliyor...")
-            usdtry = tv_get_close(tv, "USDTRY", "FX_IDC", interval)
+            usdtry = tv_get_close(tv, "USDTRY", "FX_IDC", interval, n_bars)
             if usdtry is None:
                 st.error("USDTRY alinamadi!")
                 return
@@ -197,7 +204,7 @@ def main():
             st.write(f"{len(BIST_INDICES)} endeks indiriliyor...")
             indices = {}
             for name in BIST_INDICES:
-                s = tv_get_close(tv, name, "BIST", interval)
+                s = tv_get_close(tv, name, "BIST", interval, n_bars)
                 if s is not None: indices[name] = s
             st.write(f"{len(indices)} endeks alindi")
 
@@ -207,7 +214,7 @@ def main():
             syms = list(stocks.keys())
             fails = 0
             for i, s in enumerate(syms):
-                c = tv_get_close(tv, s, "BIST", interval)
+                c = tv_get_close(tv, s, "BIST", interval, n_bars)
                 if c is not None:
                     stock_data[s] = c
                     fails = 0
@@ -227,7 +234,7 @@ def main():
             status.update(label=f"Tarama tamamlandi! {len(records)} hisse", state="complete")
 
         meta = {"usdtry": float(usdtry.iloc[-1]), "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "total_scanned": len(stock_data), "threshold": threshold}
+                "total_scanned": len(stock_data), "threshold": threshold, "period": period}
         html = generate_html(records, list(indices.keys()), meta)
         if html:
             st.session_state["html"] = html

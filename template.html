@@ -355,18 +355,27 @@ document.getElementById('footerDate').textContent = META.date;
    PARSE ENDEKS DETAY
    ============================================================ */
 function parseEndeksDetay(detayStr) {
+  /* Yeni format: "XUTUM:%0.0|+%265 | XGMYO:%1.2|+%150"
+     Her endeks icin {atl_fark, ath_pot} dondurur */
   const result = {};
-  if (!detayStr) return result;
-  const parts = detayStr.split('|');
+  if (!detayStr || detayStr === '-') return result;
+  const parts = detayStr.split(' | ');
   parts.forEach(part => {
     const trimmed = part.trim();
     const colonIdx = trimmed.indexOf(':');
     if (colonIdx === -1) return;
     const key = trimmed.substring(0, colonIdx).trim();
-    let valStr = trimmed.substring(colonIdx + 1).trim();
-    valStr = valStr.replace('%', '').replace(',', '.');
-    const val = parseFloat(valStr);
-    if (!isNaN(val)) result[key] = val;
+    const rest = trimmed.substring(colonIdx + 1).trim();
+    /* rest = "%0.0|+%265" veya "%1.2" (eski format) */
+    const subParts = rest.split('|');
+    let atlVal = parseFloat(subParts[0].replace('%','').replace(',','.'));
+    let athVal = null;
+    if (subParts.length > 1) {
+      athVal = parseFloat(subParts[1].replace('+','').replace('%','').replace(',','.'));
+    }
+    if (!isNaN(atlVal)) {
+      result[key] = { atl_fark: atlVal, ath_pot: athVal };
+    }
   });
   return result;
 }
@@ -452,14 +461,16 @@ function getStockValues(stock) {
       suffix: 'TL',
     };
   }
-  /* Index tab */
-  const idxVal = stock._endeks[activeTab];
+  /* Index tab - ATL fark VE ATH pot o endeksin grafiginden */
+  const idxData = stock._endeks[activeTab];
+  const idxAtlFark = idxData ? idxData.atl_fark : 999;
+  const idxAthPot = idxData && idxData.ath_pot != null ? idxData.ath_pot : stock['ath_pot'];
   return {
     price: stock['TL Fiyat'],
     atl: stock['TL ATL'],
     ath: stock['TL ATH'],
-    atl_fark: idxVal != null ? idxVal : 999,
-    ath_pot: stock['ath_pot'],
+    atl_fark: idxAtlFark,
+    ath_pot: idxAthPot,
     priceFmt: formatTl,
     atlFmt: formatTl,
     athFmt: formatTl,
