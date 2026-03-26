@@ -108,6 +108,17 @@ def calc_dim(series):
             "atl_pct": (cur - atl) / atl * 100.0, "ath_pot": (ath - cur) / cur * 100.0}
 
 
+def align_and_divide(numerator, denominator):
+    n, d = numerator.copy(), denominator.copy()
+    n.index = n.index.normalize()
+    d.index = d.index.normalize()
+    n = n[~n.index.duplicated(keep='last')]
+    d = d[~d.index.duplicated(keep='last')]
+    merged = pd.DataFrame({"num": n, "den": d}).ffill().dropna()
+    if len(merged) < 5: return None
+    return merged["num"] / merged["den"]
+
+
 def run_scan(stock_data, stocks_info, usdtry, indices, threshold):
     results = []
     for sym, close in stock_data.items():
@@ -116,13 +127,12 @@ def run_scan(stock_data, stocks_info, usdtry, indices, threshold):
             sector, stock_indices = info.get("sector", ""), info.get("indices", ["XUTUM"])
             tl = calc_dim(close)
             if tl is None: continue
-            ua = usdtry.reindex(close.index, method="ffill")
-            usd = calc_dim(close / ua)
+            usd = calc_dim(align_and_divide(close, usdtry))
             idx_results = []
             for idx_name in stock_indices:
                 if idx_name in indices:
-                    ia = indices[idx_name].reindex(close.index, method="ffill")
-                    dim = calc_dim(close / ia)
+                    ratio = align_and_divide(close, indices[idx_name])
+                    dim = calc_dim(ratio)
                     if dim: idx_results.append({"name": idx_name, **dim})
             best_idx = min(idx_results, key=lambda x: abs(x["atl_pct"])) if idx_results else None
             candidates = []
@@ -174,17 +184,17 @@ def main():
     with st.sidebar:
         st.header("Ayarlar")
         threshold = st.slider("ATL Esik (%)", 5, 50, 15, 1)
-        period = st.selectbox("Tarama Periyodu", ["Haftalik", "Aylik", "Son 6 Ay", "Son 12 Ay"])
+        period = st.selectbox("Mum Periyodu", ["Haftalik", "Aylik", "6 Aylik", "Yillik (12 Ay)"])
 
     if st.button("Taramayi Baslat", type="primary", use_container_width=True):
         from tvDatafeed import TvDatafeed, Interval
         period_map = {
-            "Haftalik": (Interval.in_weekly, 5000),
-            "Aylik": (Interval.in_monthly, 5000),
-            "Son 6 Ay": (Interval.in_weekly, 26),
-            "Son 12 Ay": (Interval.in_weekly, 52),
+            "Haftalik": (Interval.in_weekly, 5000, None),
+            "Aylik": (Interval.in_monthly, 5000, None),
+            "6 Aylik": (Interval.in_monthly, 5000, "6ME"),
+            "Yillik (12 Ay)": (Interval.in_monthly, 5000, "YE"),
         }
-        interval, n_bars = period_map[period]
+        interval, n_bars, resample_rule = period_map[period]
 
         with st.status("Tarama baslatiliyor...", expanded=True) as status:
             st.write("Hisse listesi aliniyor...")
@@ -227,6 +237,16 @@ def main():
                 if (i + 1) % 100 == 0: time.sleep(1)
             progress.empty()
             st.write(f"{len(stock_data)} hisse verisi alindi")
+
+            if resample_rule:
+                st.write(f"Resample ediliyor ({resample_rule})...")
+                usdtry = usdtry.resample(resample_rule).last().dropna()
+                for k in list(indices.keys()):
+                    indices[k] = indices[k].resample(resample_rule).last().dropna()
+                for k in list(stock_data.keys()):
+                    r = stock_data[k].resample(resample_rule).last().dropna()
+                    if len(r) >= 5: stock_data[k] = r
+                    else: del stock_data[k]
 
             st.write("Hesaplaniyor...")
             records = run_scan(stock_data, stocks, usdtry, indices, threshold)
