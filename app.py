@@ -41,7 +41,9 @@ SECTOR_TO_INDEX = {
 def fetch_stocks():
     url = "https://scanner.tradingview.com/turkey/scan"
     payload = {
-        "columns": ["name", "sector", "indexes"],
+        "columns": ["name", "sector", "indexes",
+                    "price_earnings_ttm", "float_shares_percent_current",
+                    "price_book_fq", "return_on_equity_fq"],
         "sort": {"sortBy": "name", "sortOrder": "asc"},
         "range": [0, 700], "markets": ["turkey"],
         "symbols": {"query": {"types": []}, "tickers": []},
@@ -70,7 +72,17 @@ def fetch_stocks():
             sec_idx = SECTOR_TO_INDEX.get(sector)
             if sec_idx: idx_list.append(sec_idx)
             idx_list.append("XUTUM")
-        stocks[sym] = {"sector": sector, "indices": idx_list}
+        fk  = vals[3] if len(vals) > 3 and vals[3] else None
+        fdo = vals[4] if len(vals) > 4 and vals[4] else None
+        pdd = vals[5] if len(vals) > 5 and vals[5] else None
+        roe = vals[6] if len(vals) > 6 and vals[6] else None
+        stocks[sym] = {
+            "sector": sector, "indices": idx_list,
+            "fk": round(fk, 2) if fk else None,
+            "fdo": round(fdo, 2) if fdo else None,
+            "pdd": round(pdd, 2) if pdd else None,
+            "roe": round(roe, 2) if roe else None,
+        }
     return stocks
 
 
@@ -156,6 +168,10 @@ def run_scan(stock_data, stocks_info, usdtry, indices, threshold):
                 "usd_atl_fark": round(usd["atl_pct"], 2) if usd else None,
                 "usd_ath_pot": round(usd["ath_pot"], 1) if usd else None,
                 "Endeks Detay": " | ".join(idx_parts) if idx_parts else "-",
+                "F/K": info.get("fk"),
+                "Fiili Dolasim %": info.get("fdo"),
+                "PD/DD": info.get("pdd"),
+                "ROE %": info.get("roe"),
             })
         except Exception: continue
     return results

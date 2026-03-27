@@ -293,6 +293,10 @@ td.mono{font-family:var(--font-data)}
           <th data-sort="ath_pot" id="thPot">ATH Pot% <span class="sort-arrow"></span></th>
           <th data-sort="grafik">Grafik <span class="sort-arrow"></span></th>
           <th data-sort="gh">GH <span class="sort-arrow"></span></th>
+          <th data-sort="fk">F/K <span class="sort-arrow"></span></th>
+          <th data-sort="fdo">FDO% <span class="sort-arrow"></span></th>
+          <th data-sort="pdd">PD/DD <span class="sort-arrow"></span></th>
+          <th data-sort="roe">ROE% <span class="sort-arrow"></span></th>
           <th style="cursor:default">Not</th>
           <th style="cursor:default">Link</th>
         </tr>
@@ -564,6 +568,22 @@ function getFilteredData() {
         av = a['gh'] || 0;
         bv = b['gh'] || 0;
         break;
+      case 'fk':
+        av = a['F/K'] != null ? a['F/K'] : 9999;
+        bv = b['F/K'] != null ? b['F/K'] : 9999;
+        break;
+      case 'fdo':
+        av = a['Fiili Dolasim %'] != null ? a['Fiili Dolasim %'] : 0;
+        bv = b['Fiili Dolasim %'] != null ? b['Fiili Dolasim %'] : 0;
+        break;
+      case 'pdd':
+        av = a['PD/DD'] != null ? a['PD/DD'] : 9999;
+        bv = b['PD/DD'] != null ? b['PD/DD'] : 9999;
+        break;
+      case 'roe':
+        av = a['ROE %'] != null ? a['ROE %'] : -9999;
+        bv = b['ROE %'] != null ? b['ROE %'] : -9999;
+        break;
       default:
         av = va.atl_fark != null ? va.atl_fark : 9999;
         bv = vb.atl_fark != null ? vb.atl_fark : 9999;
@@ -667,6 +687,11 @@ function render() {
     html += '<td><div class="pot-cell"><div class="pot-bar-wrap"><div class="pot-bar" style="width:' + barW + '%"></div></div><span class="pot-val" style="color:var(--blue)">' + potStr + '</span></div></td>';
     html += '<td class="grafik-cell">' + (stock['En Yakin Grafik'] || '-') + '</td>';
     html += '<td class="gh-stars">' + ghStars + '</td>';
+    const fk = stock['F/K']; const fdo = stock['Fiili Dolasim %']; const pdd = stock['PD/DD']; const roe = stock['ROE %'];
+    html += '<td style="color:var(--text);font-size:0.65rem">' + (fk != null ? fk.toFixed(1) : '-') + '</td>';
+    html += '<td style="color:var(--text);font-size:0.65rem">' + (fdo != null ? '%' + fdo.toFixed(1) : '-') + '</td>';
+    html += '<td style="color:var(--text);font-size:0.65rem">' + (pdd != null ? pdd.toFixed(2) : '-') + '</td>';
+    html += '<td style="color:' + (roe != null && roe > 0 ? 'var(--green)' : 'var(--red)') + ';font-size:0.65rem">' + (roe != null ? '%' + roe.toFixed(1) : '-') + '</td>';
     html += '<td><input type="text" class="note-input" placeholder="..." value="' + escapeAttr(note) + '" data-ticker="' + ticker + '" onchange="saveNote(this)"></td>';
     html += '<td><div class="link-cell"><a href="' + tvUrl + '" target="_blank" rel="noopener">TV</a><a href="' + kapUrl + '" target="_blank" rel="noopener">KAP</a></div></td>';
     html += '</tr>';
@@ -868,6 +893,10 @@ document.getElementById('exportBtn').addEventListener('click', function() {
       'ATH Pot% (Aktif)': vals.ath_pot != null ? vals.ath_pot : '',
       'En Yakın Grafik': stock['En Yakin Grafik'] || '',
       'GH': stock['gh'] || 0,
+      'F/K': stock['F/K'] != null ? stock['F/K'] : '',
+      'Fiili Dolasim %': stock['Fiili Dolasim %'] != null ? stock['Fiili Dolasim %'] : '',
+      'PD/DD': stock['PD/DD'] != null ? stock['PD/DD'] : '',
+      'ROE %': stock['ROE %'] != null ? stock['ROE %'] : '',
       'Dahil Endeksler': stock['Dahil Endeksler'] || '',
       'Not': notes[stock['Hisse']] || '',
     };
